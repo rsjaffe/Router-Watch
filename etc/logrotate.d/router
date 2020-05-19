@@ -1,0 +1,8 @@
+/var/log/router.log {
+  rotate 5
+  weekly
+  compress
+  missingok
+  notifempty
+  create 640 syslog adm
+}

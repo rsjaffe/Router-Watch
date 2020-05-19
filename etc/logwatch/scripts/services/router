@@ -1,0 +1,226 @@
+#!/usr/bin/gawk -f
+#set up
+BEGIN {
+	#save old sort order if it was set, to reset it at end of script
+	if ("sorted_in" in PROCINFO) 
+	    save_sorted = PROCINFO["sorted_in"]
+	#variable initialization
+	FS = "[ =]" #split fields on spaces or =
+	termflag = 0
+	timezoneinfo = strftime("Router log time zone %Z, UTC%z",systime())
+	mailrecipient = "root" #alter as desired
+	# use autosendports sparingly--sends complaint without human review
+	autosendport[23,"TCP"] = "Attempt to set up bot using Telnet"
+	autosendport[137,"TCP"] = "Chode, Nimda trojans"
+	autosendport[555,"TCP"] = "Ini-Killer, Phase Zero, Stealth Spy trojans"
+	autosendport[666,"TCP"] = "Satanz Backdoor, Attack FTP, Back Construction, BLA trojan, NokNok, Reverse Trojan, Shadow trojans"
+	autosendport[1025,"TCP"] = "Fraggle Rock, md5 Backdoor, NetSpy, Remote Storm trojans"
+	autosendport[1026,"TCP"] = "BDDT, Dark IRC, DataSpy Network X, Delta Remote Access , Dosh, Duddie, IRC Contact, Remote Explorer 2000, RUX The TIc.K trojans"
+	autosendport[1028,"TCP"] = "ICKiller, DataSpy Network X, Dosh, Gibbon, KiLo, KWM, Litmus, Paltalk, SubSARI trojans"
+	autosendport[1243,"TCP"] = "Ultors Trojan, BackDoor-G, SubSeven , Tiles trojans"
+	autosendport[1433,"TCP"] = "SQL Snake and other attempts to attack SQL server"
+	autosendport[2000,"TCP"] = "Remote Explorer 2000, Last 2000, Insane Ner / Der Spaeher, Senna Spy Trojan Generator, ATrojan, InsaneNetwork trojans"
+	autosendport[2020,"TCP"] = "Backdoor.Rockse trojan"
+	autosendport[2323,"TCP"] = "Attempt to set up bot using Telnet"
+	autosendport[3128,"TCP"] = "Reverse WWW Tunnel Backdoor, RingZero, MastersParadise, and MyDoom trojans"
+	autosendport[3389,"TCP"] = "BlueKeep (Attempt to compromise Windows RDP Protocol)"
+	autosendport[5000,"TCP"] = "UPnP port, no reason for external access other than attack attempt, multiple Trojans attack this port"
+	autosendport[5060,"UDP"] = "SIP port, scanning for VOIP exploits"
+	autosendport[6667,"TCP"] = "Dark FTP, EGO, Maniac rootkit, Moses, ScheduleAgent, SubSeven, The Thing (modified), Trinity, WinSatan trojans"
+	autosendport[6670,"TCP"] = "BackWeb Server, Deep Throat, Foreplay, WinNuke eXtreame trojans"
+	autosendport[6711,"TCP"] = "BackDoor-G, SubSeven, SubSARI, VP Killer, DeepThroat, Noknok trojans"
+	autosendport[6969,"TCP"] = "2000 Cracks, BlitzNet, Dark IRC, GateCrasher, Kid Terror, Laphex, Net Controller, SpArTa, Vagr Nocker, Priority trojans"
+	autosendport[7000,"TCP"] = "Aladino, Gunsan, Remote Grab, SubSeven , SubSeven 2.1 Gold, Theef trojans"
+	autosendport[8888,"TCP"] = "W32.Axatak, Dark IRC trojans"
+	autosendport[9999,"TCP"] = "The Prayer 1, ForcedEntry, Infra, The prayer 1.2 -1.3, BlitzNet, Oracle, and Spadeace trojans"
+	autosendport[11211,"UDP"] = "Memcrashed amplification attack using the memcached protocol"
+	autosendport[12345,"TCP"] = "GabanBus, NetBus, Pie Bill Gates, X-bill trojans"
+	autosendport[12346,"TCP"] = "GabanBus, NetBus, X-bill trojans"
+	autosendport[16471,"UDP"] = "ZeroAccess/Sirefef trojan rootkit" # port index, value name of exploit
+	autosendport[16464,"UDP"] = autosendport[16465,"UDP"] = autosendport[16470,"UDP"] = autosendport[16471,"UDP"]
+	autosendport[21554,"TCP"] = "Exploiter, Schwindler, Kid Terror, FreddyK, Winsp00fer trojans"
+	autosendport[22222,"TCP"] = "Donald Dick, G.R.O.B., Prosiak, Ruler, RUX The TIc.K trojans"
+	autosendport[27374,"TCP"] = "Bad Blood, Fake SubSeven, li0n, Ramen, Seeker, SubSeven , SubSeven 2.1 Gold, Subseven 2.1.4 DefCon 8, SubSeven 2.2, SubSeven Muie, The Saint trojans"
+	autosendport[29559,"TCP"] = "DuckToy, Katux, Latinus, Pest trojans"
+	autosendport[31337,"TCP"] = "Back Orifice Client, Baron Night, B02, Bo Facil trojans"
+	autosendport[31337,"UDP"] = "BackFire, Back Orifice, DeepBO trojans"
+	autosendport[31338,"TCP"] = "Back Orifice, Butt Funnel, NetSpy (DK) trojans"
+	autosendport[31338,"UDP"] = "Back Orifice, DeepBO trojans"
+	autosendport[53413,"UDP"] = "Netis router backdoor attempt"
+}
+
+#deal with each log line type separately
+
+/action=DROP/ { #blocked attempts
+	port=""
+	protocol=""
+	source=""
+	for (i=1; i<=NF; i++)
+	{
+		#$i is the field, $(i+1) is next field
+		switch ($i) {
+			case "SRC":
+				source = $(++i)
+                                if (substr(source,1,9) == "192.168.1")
+                                    next # skip this line
+				lines[$i] = lines[$i] "\n" $0 #collect lines for complaint later
+				break
+			case "PROTO":
+				protocol = $(++i)
+				break
+			case "DPT":
+				port = $(++i)
+		}
+	}
+	if (port SUBSEP protocol in autosendport)
+		if ( index ( autosendip[source], port "(" protocol ) == 0) #haven't recorded this complaint yet
+			autosendip[source] = autosendip[source] " Port " port "(" protocol ")=" autosendport[port,protocol] "\n"
+	if (length(port) > 0) #have null ports for ICMP
+		ports[port,protocol]++ #count the number of times a port is attacked was [port] only, added protocol for report changes
+	attackers[source]++ #count the number of times a particular ip is attacking
+	next # ignore other rules
+} #end of DROP block
+
+/dnsmasq\[[0-9]+\] L3: bad name at/ {
+	next # ignore bad name errors
+}
+
+/dnsmasq\[[0-9]+\]/ {
+#	dnsmasq = dnsmasq "\n" $0
+	dnsmasqmsg[substr($0,match($0,"L3: ")+4)]++ #count times it appears
+	next
+} # end of dnsmasq
+
+/sdb\[[0-9]+\] L3: DSL:/ {
+	interestinglines = interestinglines "\n" $0
+} # here we accumulate all messages of miscellaneous interest
+
+/mcp\[[0-9]+\]/ || /sdb\[[0-9]+\]/ || /cwmp\[[0-9]+\]/ || /dhcpdp\[[0-9]+\]/ || /radv\[[0-9]+\]/ {
+	next # ignoring these services for now
+} #end of ignored services
+
+{
+	unmatched = unmatched "\n" $0
+	#no next needed, last rule
+}#for all other lines
+
+
+#then, at end, produce the report
+
+END {
+
+	######################################################################
+	#                         printing out top ports                     #
+	######################################################################
+
+	PROCINFO["sorted_in"] = "@val_num_desc"   #iterate arrays sorted by numeric value descending to display top values
+	print "\nTop ports"
+	count = 1 #counter to stop loop if more than 20 ports in list
+	for (i in ports)
+	{
+		split (i, separate, SUBSEP) #added to show protocol and port
+		printf "%5d\t%-5s\t%5d times\n", separate[1], separate[2], ports[i] #changed from i to separate[1] separate[2] to show protocol and port
+		if (++count > 20) #increment moved from separate statement
+			break
+	}
+
+	######################################################################
+	#            printing out top attackers                              #
+	######################################################################
+
+	print "\nTop attackers"
+	count = 1 #counter to stop loop if more than 20 ports in list
+	for (i in attackers)
+	{	
+		cmd = "dig +short -x " i
+		while ( (cmd | getline hostname) > 0 ) #last line of output is the hostname we want
+			{}
+		close(cmd)
+		printf "%-40s\t%5d\t%s\t%s\n", i, attackers[i], "times", hostname
+		if (++count > 20)
+			break
+	}
+
+	######################################################################
+	#           printing out DHCP requests:                              #
+	######################################################################
+
+	print "\nDHCP requests"
+	PROCINFO["sorted_in"] = "@ind_str_asc" 
+	for (combined in dhcp) { 
+		split (combined, separate, SUBSEP) #split the array indices to print them
+		print separate[1] "\t"  separate[2] "\t" dhcp[combined]
+	}
+
+	######################################################################
+	#        send complaints about obvious attacks                       #
+	######################################################################
+
+	print "\nChecking complaint addresses for attackers. Unregistered attackers follow."
+	for (ipaddress in lines) #sort order doesn't matter for this iteration
+	{
+		complaintemail = ""
+		cmd = "querycontacts " ipaddress #querycontacts obtains the abuse contact
+		while ( (cmd | getline complainto) > 0 )
+			complaintemail = complaintemail " " complainto #sometimes have more than one abuse contact
+		close(cmd)
+		if ( length (complaintemail) > 2 ) #some ip addresses "rogue", aren't registered, so no abuse contact
+		{	if (ipaddress in autosendip && complaintemail != "abuse@singlehop.com") #directly send complaint, skip shodan probes (shodan abuse address is at singlehop)
+			{
+				complainttext = "To: " complaintemail "\n" autosendip[ipaddress] ".\n" timezoneinfo ".  Router logs follow.\n" lines[ipaddress]
+				cmd = "mailx -s 'abuse report' " complaintemail
+				print complainttext | cmd
+				close(cmd) #end of message
+			}
+			else # add this to the list to send to mailrecipient, since we have a complaint address and haven't automatically sent a complaint
+				complaintemailbyip[ipaddress] = complaintemail #if this text doesn't get assigned to this array, the next step will ignore this ip address 
+		}
+	}
+
+	######################################################################
+	#       assemble other attacks by complaint email for review         #
+	######################################################################
+
+	PROCINFO["sorted_in"] = "@val_str_asc" #sort by complaint addresses
+	complaintemail = "" #we do have to null the variable, as used it before
+	complainttext = "" #ditto
+	for (ipaddress in complaintemailbyip)
+	{
+		if (complaintemail == complaintemailbyip[ipaddress]) #already working on this email address
+			complainttext =  complainttext "________________________\n" lines[ipaddress] "\n"
+		else #new email address
+		{
+			complaintemail = complaintemailbyip[ipaddress]
+			complainttext = complainttext "\n" complaintemail "\n" timezoneinfo "\nRouter logs follow, separated by source IP\n" lines[ipaddress] "\n" 
+		}
+	}
+	cmd = "mailx -s 'Abuse Reports for Review' " mailrecipient #change mailrecipient in BEGIN block if don't want it going to root
+	print complainttext | cmd
+	close(cmd) #should also signal end of message
+
+	######################################################################
+	#		dnsmasq lines					     #
+	######################################################################
+	print "\ndnsmasq messages"
+	for (i in dnsmasqmsg)
+		print i "\t" dnsmasqmsg[i] "\ttime(s)"
+
+
+	######################################################################
+	#            other lines of interest                                 #
+	######################################################################
+	if (length(interestinglines)>1)
+		print "\nOther lines of interest" interestinglines
+
+
+	######################################################################
+	#             print out unmatched lines                              #
+	######################################################################
+
+	if (length(unmatched)>1)
+		print "\nUnmatched lines" unmatched
+	#restore default sort order	
+	if (save_sorted)
+		PROCINFO["sorted_in"] = save_sorted
+}
+
