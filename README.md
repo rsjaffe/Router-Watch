@@ -1,6 +1,6 @@
 routerwatch
 
-requires installation of mailutils and gawk
+requires installation of mailutils, dnsutils and gawk
 
 etc/logwatch/scripts/services/router must be made executable
 

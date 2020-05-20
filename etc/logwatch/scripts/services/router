@@ -95,7 +95,7 @@ BEGIN {
 	interestinglines = interestinglines "\n" $0
 } # here we accumulate all messages of miscellaneous interest
 
-/mcp\[[0-9]+\]/ || /sdb\[[0-9]+\]/ || /cwmp\[[0-9]+\]/ || /dhcpdp\[[0-9]+\]/ || /radv\[[0-9]+\]/ {
+/mcp\[[0-9]+\]/ || /sdb\[[0-9]+\]/ || /cwmp\[[0-9]+\]/ || /dhcpdp\[[0-9]+\]/ || /radv\[[0-9]+\]/ || /connh\[[0-9]+\]/ {
 	next # ignoring these services for now
 } #end of ignored services
 
